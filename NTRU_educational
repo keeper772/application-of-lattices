@@ -1,1 +1,128 @@
-Nie tym razem misiu kolorowy
+############################################################
+import random
+import time
+import numpy
+############################################################
+#FUNCTIONS
+#----------------------------------------------------------
+#generates random list(size N) of coefficents with d1 1s and d2 -1s
+#returns list of coefficents
+def gen_trinary_poly_list(d1,d2, N):
+	coefficents = [0] * N
+	while d1 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = 1
+			d1 -= 1
+	while d2 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = -1
+			d2 -= 1
+	return coefficents
+#----------------------------------------------------------
+#ntru central lift with given modulus
+#returns list of coefficents
+def CentralLift(poly,N,basis):
+	coefficents = [0] * N
+	for i  in range(N):
+		if  int(poly[i]) <= basis/2:
+			coefficents[i] = int(poly[i])
+		else:
+			coefficents[i] = int(poly[i]) - basis
+	return coefficents
+#----------------------------------------------------------
+#generating keys
+#f - private key (list of coefficents, not inverted)
+#hq - public key (polynomial in quot_poly_ring_q)
+def GEN(N,p,q,d):	
+	g = gen_trinary_poly_list(d,d,N)
+	gq = quot_poly_ring_q(g)
+	f = gen_trinary_poly_list(d,d-1,N)
+	while True:
+		f = gen_trinary_poly_list(d,d-1,N)
+		fp = quot_poly_ring_p(f)
+		fq = quot_poly_ring_q(f)
+		try:
+			fp ** -1
+			fq ** -1
+		except ZeroDivisionError:
+			continue
+		break
+	hq = p * (fq ** -1) * gq
+	return f,hq
+#----------------------------------------------------------
+#encryption
+#returns polynomial in quot_poly_ring_q
+def ENC(hq,m,dr,N):
+	rq = quot_poly_ring_q(gen_trinary_poly_list(dr,dr,N))
+	mq = quot_poly_ring_q(m)
+	eq = rq * hq + mq
+	return eq
+#----------------------------------------------------------	
+#deccryption
+#returns m as list of coefficents
+def DEC(eq,f,N):
+	fq = quot_poly_ring_q(f)
+	fp = quot_poly_ring_p(f)
+	aq = eq * fq
+	a = CentralLift(aq,N,q)
+	ap = quot_poly_ring_p(a)
+	mp = ap * (fp ** -1)
+	m = CentralLift(mp,N,p)
+	return m
+#----------------------------------------------------------	
+#generates keys, random message, check if decryption is correct
+#measures times
+def test():
+	gen_time_start = time.time()
+	f,hq = GEN(N,p,q,d)
+	gen_time_stop = time.time()
+	m = gen_trinary_poly_list(d,0,N)
+	enc_time_start = time.time()
+	eq = ENC(hq,m,d,N)
+	enc_time_stop = time.time()
+	dec_time_start = time.time()
+	m1 = DEC(eq,f,N)
+	dec_time_stop = time.time()
+	gen_time = gen_time_stop - gen_time_start
+	enc_time = enc_time_stop - enc_time_start
+	dec_time = dec_time_stop - dec_time_start
+	return m == m1, gen_time, enc_time, dec_time
+############################################################
+#INPUT DATA
+N = 167
+p = 2
+q = 127
+d = 10
+############################################################
+#STRUCTURES
+field_p = GF(p)
+poly_ring_p.<z> = PolynomialRing(field_p)
+quot_poly_ring_p.<x> = poly_ring_p.quotient(z ** N -1)
+
+field_q = GF(q)
+poly_ring_q.<v> = PolynomialRing(field_q)
+quot_poly_ring_q.<y> = poly_ring_q.quotient(v ** N -1)
+
+############################################################
+#MAIN PROGRAM
+tries = 10000
+succes = 0
+gen_times = []
+enc_times = []
+dec_times = []
+for i in range(tries):
+	test_result,gen_time, enc_time, dec_time = test()
+	gen_times.append(gen_time)
+	enc_times.append(enc_time)
+	dec_times.append(dec_time)
+	if test_result:
+		succes += 1
+print "NTRU educational times and succes rate"
+print (float(succes/tries)) * 100, "% of succes"
+print "AVG GEN time: ",numpy.average(gen_times)
+print "AVG ENC time: ",numpy.average(enc_times)
+print "AVG DEC time: ",numpy.average(dec_times)
+
+
