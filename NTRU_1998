@@ -1,1 +1,137 @@
-Nie tym razem misiu kolorowy
+############################################################
+import random
+import time
+import numpy
+############################################################
+#FUNCTIONS
+#----------------------------------------------------------
+#generates random list(size N) of coefficents with d1 1s and d2 -1s
+def gen_trinary_poly_list(d1,d2, N):
+	coefficents = [0] * N
+	while d1 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = 1
+			d1 -= 1
+	while d2 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = -1
+			d2 -= 1
+	return coefficents
+#----------------------------------------------------------
+#ntru central lift with given modulus
+#returns list of coefficents
+def CentralLift(poly,N,basis):
+	coefficents = [0] * N
+	for i  in range(N):
+		if  int(poly[i]) <= basis/2:
+			coefficents[i] = int(poly[i])
+		else:
+			coefficents[i] = int(poly[i]) - basis
+	return coefficents
+#----------------------------------------------------------
+#generating keys
+#f - private key (list of coefficents, not inverted)
+#hq - public key (polynomial in quot_poly_ring_q)
+def GEN(N,p,q,df,dg):	
+	g = gen_trinary_poly_list(dg,dg,N)
+	gq = quot_poly_ring_q(g)
+	f = gen_trinary_poly_list(df,df-1,N)
+	fq_reversed = reverse_power_prime(f,q)
+	hq = p * (fq_reversed) * gq
+	return f,hq 
+#----------------------------------------------------------
+#encryption
+#returns polynomial in quot_poly_ring_q
+def ENC(hq,m,dr,N):
+	rq = quot_poly_ring_q(gen_trinary_poly_list(dr,dr,N))
+	mq = quot_poly_ring_q(m)
+	eq = rq * hq + mq
+	return eq
+#----------------------------------------------------------	
+#deccryption
+#returns m as list of coefficents
+def DEC(eq,f,N):
+	fq = quot_poly_ring_q(f)
+	fp = quot_poly_ring_p(f)
+	aq = eq * fq
+	a = CentralLift(aq,N,q)
+	ap = quot_poly_ring_p(a)
+	mp = ap * (reverse_prime(f,p))
+	m = CentralLift(mp,N,p)
+	return m
+#----------------------------------------------------------	
+#reversing polynomial in ring with coefficents modulo 2^k = basis
+#returns polynomial in quot_poly_ring_q
+def reverse_power_prime(poly,basis):
+	W_ring.<u> = GF(2)[]
+	W.<w> = W_ring.quotient(u ** N - 1)
+	poly_w = W(poly) ** -1
+	poly_q_reversed = quot_poly_ring_q(poly_w.lift().list())
+	poly_q = quot_poly_ring_q(poly)
+	remainder = poly_q_reversed * poly_q
+	while remainder != 1:
+		poly_q_reversed = poly_q_reversed * (2 - remainder)
+		remainder = poly_q_reversed * poly_q
+	return poly_q_reversed
+#----------------------------------------------------------	
+#reversing polynomial in ring with coefficents modulo basis
+#basis must be prime
+#returns plynomial in quot_poly_ring_p
+def reverse_prime(poly,basis):
+	W_ring.<l> = GF(basis)[]
+	W.<o> = W_ring.quotient(l ** N - 1)
+	return quot_poly_ring_p((W(poly) ** -1).lift().list())
+#---------------------------------------------------------
+#generates keys, random message, check if decryption is correct
+#measures times
+def test():
+	gen_time_start = time.time()
+	f,hq = GEN(N,p,q,df,dg)
+	gen_time_stop = time.time()
+	m = gen_trinary_poly_list(18,18,N)
+	enc_time_start = time.time()
+	eq = ENC(hq,m,dr,N)
+	enc_time_stop = time.time()
+	dec_time_start = time.time()
+	m1 = DEC(eq,f,N)
+	dec_time_stop = time.time()
+	gen_time = gen_time_stop - gen_time_start
+	enc_time = enc_time_stop - enc_time_start
+	dec_time = dec_time_stop - dec_time_start
+	return m == m1, gen_time, enc_time, dec_time
+############################################################
+#INPUT DATA
+N = 167
+p = 3 
+q = 128
+df = 61
+dg = 20
+dr = 18
+#STRUCTURES
+poly_ring_p.<z> = Zmod(p)[]
+quot_poly_ring_p.<x> = poly_ring_p.quotient(z ** N -1)
+poly_ring_q.<v> = Zmod(q)[]
+quot_poly_ring_q.<y> = poly_ring_q.quotient(v ** N -1)
+############################################################
+#MAIN PROGRAM
+tries = 10000
+succes = 0
+gen_times = []
+enc_times = []
+dec_times = []
+for i in range(tries):
+	test_result,gen_time, enc_time, dec_time = test()
+	gen_times.append(gen_time)
+	enc_times.append(enc_time)
+	dec_times.append(dec_time)
+	if test_result:
+		succes += 1
+print "NTRU 1998 times and succes rate"
+print (float(succes/tries)) * 100, "% of succes"
+print "AVG GEN time: ",numpy.average(gen_times)
+print "AVG ENC time: ",numpy.average(enc_times)
+print "AVG DEC time: ",numpy.average(dec_times)
+
+
