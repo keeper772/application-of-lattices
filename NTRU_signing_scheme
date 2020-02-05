@@ -1,11 +1,180 @@
-$$$$$$\                          $$\                                                                   
-$$  __$$\                         \__|                                                                  
-$$ /  \__| $$$$$$\  $$$$$$\$$$$\  $$\ $$$$$$$\   $$$$$$\         $$$$$$$\  $$$$$$\   $$$$$$\  $$$$$$$\  
-$$ |      $$  __$$\ $$  _$$  _$$\ $$ |$$  __$$\ $$  __$$\       $$  _____|$$  __$$\ $$  __$$\ $$  __$$\ 
-$$ |      $$ /  $$ |$$ / $$ / $$ |$$ |$$ |  $$ |$$ /  $$ |      \$$$$$$\  $$ /  $$ |$$ /  $$ |$$ |  $$ |
-$$ |  $$\ $$ |  $$ |$$ | $$ | $$ |$$ |$$ |  $$ |$$ |  $$ |       \____$$\ $$ |  $$ |$$ |  $$ |$$ |  $$ |
-\$$$$$$  |\$$$$$$  |$$ | $$ | $$ |$$ |$$ |  $$ |\$$$$$$$ |      $$$$$$$  |\$$$$$$  |\$$$$$$  |$$ |  $$ |
- \______/  \______/ \__| \__| \__|\__|\__|  \__| \____$$ |      \_______/  \______/  \______/ \__|  \__|
-                                                $$\   $$ |                                              
-                                                \$$$$$$  |                                              
-                                                 \______/                                               
+############################################################
+import random
+import time
+import numpy
+############################################################
+#FUNCTIONS
+#----------------------------------------------------------
+
+def gen_trinary_poly_list(d1,d2, N):
+	coefficents = [0] * N
+	while d1 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = 1
+			d1 -= 1
+	while d2 > 0:
+		index = random.randint(0,N-1)
+		if coefficents[index] == 0:
+			coefficents[index] = -1
+			d2 -= 1
+	return coefficents
+
+#----------------------------------------------------------
+
+def GEN(N,q,d):	
+	g_list = gen_trinary_poly_list(d,d-1,N)
+	f_list = gen_trinary_poly_list(d,d-1,N)
+	F,G = get_F_G(f_list,g_list,q)
+	
+	while F == -1 and G == -1:
+		g_list = gen_trinary_poly_list(d,d-1,N)
+		f_list = gen_trinary_poly_list(d,d-1,N)
+		F,G = get_F_G(poly_ring(f_list),poly_ring(g_list),q)
+	f = quot_poly_ring_Q(f_list)
+	g = quot_poly_ring_Q(g_list)
+	return f,g,F,G
+#----------------------------------------------------------
+def get_F_G(f_list,g_list,q):
+	f = poly_ring(f_list)
+	g = poly_ring(g_list)
+	Rf,f1,f2 = xgcd(f,l ** N - 1)
+	Rg,g1,g2 = xgcd(g,l ** N - 1)
+	c,Sf,Sg = xgcd(Rf,Rg)
+	if c != 1:
+		return -1,-1
+	A = quot_poly_ring_Q(q * Sf * f1)
+	B = quot_poly_ring_Q(-q * Sg * g1)
+	f = quot_poly_ring_Q(f_list)
+	g = quot_poly_ring_Q(g_list)
+
+	C = (B * f ** -1 + A * g ** -1) / 2
+	C_list = round_poly(C)
+
+	C = quot_poly_ring_Q(C_list)
+	F = B - C * f
+	G = A - C * g
+
+	return F,G
+#----------------------------------------------------------
+def sign(f,g,F,G,m,q):
+	
+	m1 = quot_poly_ring_Q(m[0])
+	m2 = quot_poly_ring_Q(m[1])
+	
+	b1 = (m1 * G - m2 * F)/q
+	b1_list = b1.list()
+	
+	b2 = (-m1 * g + m2 * f)/q
+	b2_list = b2.list()
+	
+
+	b1_list = round_poly(b1)
+	b1 = quot_poly_ring_Q(b1_list)
+	
+	b2_list = round_poly(b2)
+	b2 = quot_poly_ring_Q(b2_list)
+
+	s = b1 * f + b2 * F
+	
+	s = quot_poly_ring_q(s.list())
+	f = quot_poly_ring_q(f.list())
+	g = quot_poly_ring_q(g.list())
+	h = (f ** -1) * g
+	sh = s * h
+
+	return s,sh
+#----------------------------------------------------------
+def verify(s,sh,m,q,beta):
+
+	s_list = s.list()
+	sh_list = sh.list()
+	m1_list = quot_poly_ring_q(m[0]).list()
+	m2_list = quot_poly_ring_q(m[1]).list()
+	
+	for i in range(N):
+		s_list[i] = s_list[i].lift()
+		sh_list[i] = sh_list[i].lift()
+		m1_list[i] = m1_list[i].lift()
+		m2_list[i] = m2_list[i].lift()
+	signature = [s_list, sh_list]
+	messege = [m1_list, m2_list]
+	d = float(sqrt((r_semi_norm(m1_list) - r_semi_norm(s_list)) ** 2 + (r_semi_norm(m2_list) - r_semi_norm(sh_list)) ** 2))
+	return d
+#----------------------------------------------------------
+def r_semi_norm(poly_list):
+	sum = 0
+	square_sum = 0
+	for i in poly_list:
+		sum += i
+		square_sum += i ** 2
+	result = square_sum - ((sum ** 2) / len(poly_list))
+	return result
+#----------------------------------------------------------
+def round_poly(poly):
+	poly_list = poly.list()
+	for i in range(len(poly_list)):
+		poly_list[i] = poly_list[i].round()
+	return poly_list
+#----------------------------------------------------------
+def gen_messege():
+	m1 = [0] * N
+	m2 = [0] * N
+	for i in range(N):
+		m1[i] = random.randint(0,q-1)
+		m2[i] = random.randint(0,q-1)
+	result = [m1,m2]
+	return result
+############################################################
+#INPUT DATA
+N = 251
+q = 127
+d = 72
+tries = 1000
+############################################################
+#STRUCTURES
+
+field_q = GF(q)
+poly_ring_q.<v> = PolynomialRing(field_q)
+quot_poly_ring_q.<y> = poly_ring_q.quotient(v ** N - 1)
+
+poly_ring.<l> = PolynomialRing(ZZ)
+quot_poly_ring.<k> = poly_ring.quotient(l ** N - 1 )
+
+poly_ring_Q.<a> = PolynomialRing(QQ)
+quot_poly_ring_Q.<u> = poly_ring_Q.quotient(a ** N - 1 )
+############################################################
+
+#MAIN PROGRAM
+
+d_list_valid = [0] * tries
+d_list_invalid = [0] * tries
+for i in range(tries):
+	m = gen_messege()
+	f,g,F,G = GEN(N,q,d)
+	s,sh = sign(f,g,F,G,m,q)
+	d_list_valid[i] = verify(s,sh,m,q,beta)
+	m = gen_messege()
+	d_list_invalid[i] = verify(s,sh,m,q,beta)
+	print i
+
+print "Min value of d of valid signatures = \t",min(d_list_valid)
+print "Max value of d of valid signatures = \t",max(d_list_valid)
+
+print "Min value of d of invalid signatures = \t",min(d_list_invalid)
+print "Max value of d of invalid signatures = \t",max(d_list_invalid)
+
+sum = 0
+sum_under_low = 0
+for i in d_list_valid:
+	sum += i
+
+print "AVG d for valid signatures = \t",sum/tries
+sum = 0
+for i in d_list_invalid:
+	sum += i
+
+print "AVG d for invalid signatures = \t",sum/tries
+
+
+                                             
